@@ -71,7 +71,7 @@ if tar_run.returncode > 0:
   print(f"Git clone exited with {tar_run.returncode}: {tar_run.stdout} \n {tar_run.stderr}")
   exit(1)
 
-dcmp = dircmp(extractpath, clonepath + "/repo") 
+dcmp = dircmp(clonepath + "/repo", extractpath) 
 report_diff(".", dcmp) 
 
 
