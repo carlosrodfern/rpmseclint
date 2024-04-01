@@ -10,21 +10,22 @@ import os
 import sys
 from filecmp import dircmp
 
+REPO_SUBDIR="repo"
 
 def report_diff(prefix, dcmp):
 
     must_review = False
     for name in dcmp.diff_files:
-        print(f"~ {prefix}/{name}")
+        print("~ ", os.path.join(prefix, name))
         must_review = True
     for name in dcmp.left_only:
-        print(f"- {prefix}/{name}")
+        print("- ", os.path.join(prefix, name))
         must_review = True
     for name in dcmp.right_only:
-        print(f"+ {prefix}/{name}")
+        print("+ ", os.path.join(prefix, name))
         must_review = True
     for name, sub_dcmp in dcmp.subdirs.items():
-        must_review_returned = report_diff(prefix+"/"+name, sub_dcmp)
+        must_review_returned = report_diff(os.path.join(prefix, name), sub_dcmp)
         must_review = must_review or must_review_returned
     return must_review
 
@@ -62,7 +63,7 @@ if vcs != "git":
 
 clonepath = tempfile.mkdtemp()
 
-git_run = subprocess.run(["git", "-C", clonepath, "clone", repo_uri, "--branch", tag, "repo"], capture_output=True)
+git_run = subprocess.run(["git", "-C", clonepath, "clone", repo_uri, "--branch", tag, REPO_SUBDIR], capture_output=True)
 
 if git_run.returncode > 0:
   print(f"git clone exited with {git_run.returncode}: {git_run.stdout} \n {git_run.stderr}")
@@ -83,7 +84,7 @@ if tar_run.returncode > 0:
   print(f"tar xf exited with {tar_run.returncode}: {tar_run.stdout} \n {tar_run.stderr}")
   exit(1)
 
-dcmp = dircmp(clonepath + "/repo", extractpath)
+dcmp = dircmp(os.path.join(clonepath, REPO_SUBDIR), extractpath)
 
 print("-----Diff-----")
 must_review = report_diff(".", dcmp)
