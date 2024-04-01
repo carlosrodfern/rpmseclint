@@ -13,14 +13,20 @@ from filecmp import dircmp
 
 def report_diff(prefix, dcmp):
 
+    must_review = False
     for name in dcmp.diff_files:
         print(f"~ {prefix}/{name}")
+        must_review = True
     for name in dcmp.left_only:
         print(f"- {prefix}/{name}")
+        must_review = True
     for name in dcmp.right_only:
         print(f"+ {prefix}/{name}")
+        must_review = True
     for name, sub_dcmp in dcmp.subdirs.items():
-        report_diff(prefix+"/"+name, sub_dcmp)
+        must_review_returned = report_diff(prefix+"/"+name, sub_dcmp)
+        must_review = must_review or must_review_returned
+    return must_review
 
 def list_files(input):
     for fd, subfds, fns in os.walk(input):
@@ -80,7 +86,7 @@ if tar_run.returncode > 0:
 dcmp = dircmp(clonepath + "/repo", extractpath)
 
 print("-----Diff-----")
-report_diff(".", dcmp)
+must_review = report_diff(".", dcmp)
 
 print("-----Blobs----")
 
@@ -89,10 +95,15 @@ for fn in list_files(extractpath):
     rel_fn = fn[len(extractpath)+1:]
     if out.returncode > 0:
        print(f"error looking into {rel_fn}")
+       must_review = True
     mime = out.stdout.decode("utf-8")
     if not mime.startswith("text/"):
        print(f"{mime} {rel_fn}")
+       must_review = True
 
 shutil.rmtree(clonepath)
 os.remove(tarfile)
 shutil.rmtree(extractpath)
+
+if must_review:
+   exit(2)
