@@ -87,7 +87,7 @@ if tar_run.returncode > 0:
 dcmp = dircmp(os.path.join(clonepath, REPO_SUBDIR), extractpath)
 
 print("-----Diff-----")
-must_review = report_diff(".", dcmp)
+must_review = report_diff("", dcmp)
 
 print("-----Blobs----")
 
