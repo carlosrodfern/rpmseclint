@@ -10,7 +10,7 @@ The spec file must have a `VCS:` tag with the following structure:
 git+[GIT REPO URL]#[TAG]
 ```
 
-And `Source0:` must be the tar representing the git repo.
+And `Source0:` must be the tar containing the source represented in the git repo.
 
 For example:
 
