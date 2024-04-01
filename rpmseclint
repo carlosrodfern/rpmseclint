@@ -66,7 +66,8 @@ clonepath = tempfile.mkdtemp()
 git_run = subprocess.run(["git", "-C", clonepath, "clone", repo_uri, "--branch", tag, REPO_SUBDIR], capture_output=True)
 
 if git_run.returncode > 0:
-  print(f"git clone exited with {git_run.returncode}: {git_run.stdout} \n {git_run.stderr}")
+  error = git_run.stderr.decode("utf-8")
+  print(f"git clone exited with {git_run.returncode}: {error}")
   exit(1)
 
 tarurl,_,_ = next(reversed(spec.sources)) # TODO: cleanup, assuming first source0 is the tar.gz
@@ -81,7 +82,8 @@ extractpath = tempfile.mkdtemp()
 
 tar_run = subprocess.run(["tar", "xf", tarfile, "-C", extractpath, "--strip-components=1"], capture_output=True)
 if tar_run.returncode > 0:
-  print(f"tar xf exited with {tar_run.returncode}: {tar_run.stdout} \n {tar_run.stderr}")
+  error = tar_run.stderr.decode("utf-8")
+  print(f"tar xf exited with {tar_run.returncode}: {error}")
   exit(1)
 
 dcmp = dircmp(os.path.join(clonepath, REPO_SUBDIR), extractpath)
@@ -97,7 +99,7 @@ for fn in list_files(extractpath):
     if out.returncode > 0:
        print(f"error looking into {rel_fn}")
        must_review = True
-    mime = out.stdout.decode("utf-8")
+    mime = out.stdout.decode("utf-8").strip()
     if not mime.startswith("text/"):
        print(f"{mime} {rel_fn}")
        must_review = True
