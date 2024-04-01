@@ -22,6 +22,11 @@ def report_diff(prefix, dcmp):
     for name, sub_dcmp in dcmp.subdirs.items():
         report_diff(prefix+"/"+name, sub_dcmp)
 
+def list_files(input):
+    for fd, subfds, fns in os.walk(input):
+       for fn in fns:
+            yield os.path.join(fd, fn)
+
 spec = rpm.spec(sys.argv[1])
 vcs_re =  re.compile("^VCS:(.*)$")
 
@@ -47,13 +52,14 @@ tag = vcs_match.group(3)
 
 if vcs != "git":
   print("Only git is supported, but found: {vcs}")
+  exit(0)
 
 clonepath = tempfile.mkdtemp()
 
 git_run = subprocess.run(["git", "-C", clonepath, "clone", repo_uri, "--branch", tag, "repo"], capture_output=True)
 
 if git_run.returncode > 0:
-  print(f"Git clone exited with {git_run.returncode}: {git_run.stdout} \n {git_run.stderr}")
+  print(f"git clone exited with {git_run.returncode}: {git_run.stdout} \n {git_run.stderr}")
   exit(1)
 
 tarurl,_,_ = next(reversed(spec.sources)) # TODO: cleanup, assuming first source0 is the tar.gz
@@ -68,12 +74,24 @@ extractpath = tempfile.mkdtemp()
 
 tar_run = subprocess.run(["tar", "xf", tarfile, "-C", extractpath, "--strip-components=1"], capture_output=True)
 if tar_run.returncode > 0:
-  print(f"Git clone exited with {tar_run.returncode}: {tar_run.stdout} \n {tar_run.stderr}")
+  print(f"tar xf exited with {tar_run.returncode}: {tar_run.stdout} \n {tar_run.stderr}")
   exit(1)
 
-dcmp = dircmp(clonepath + "/repo", extractpath) 
-report_diff(".", dcmp) 
+dcmp = dircmp(clonepath + "/repo", extractpath)
 
+print("-----Diff-----")
+report_diff(".", dcmp)
+
+print("-----Blobs----")
+
+for fn in list_files(extractpath):
+    out = subprocess.run(["file", "--mime-type", "--brief", fn], capture_output=True)
+    rel_fn = fn[len(extractpath)+1:]
+    if out.returncode > 0:
+       print(f"error looking into {rel_fn}")
+    mime = out.stdout.decode("utf-8")
+    if not mime.startswith("text/"):
+       print(f"{mime} {rel_fn}")
 
 shutil.rmtree(clonepath)
 os.remove(tarfile)
