@@ -1,0 +1,80 @@
+#!/usr/bin/python
+
+import rpm
+import re
+import tempfile
+import shutil
+import subprocess
+import requests
+import os
+import sys
+from filecmp import dircmp
+
+
+def report_diff(prefix, dcmp):
+
+    for name in dcmp.diff_files:
+        print(f"~ {prefix}/{name}")
+    for name in dcmp.left_only:
+        print(f"- {prefix}/{name}")
+    for name in dcmp.right_only:
+        print(f"+ {prefix}/{name}")
+    for name, sub_dcmp in dcmp.subdirs.items():
+        report_diff(prefix+"/"+name, sub_dcmp)
+
+spec = rpm.spec(sys.argv[1])
+vcs_re =  re.compile("^VCS:(.*)$")
+
+uri = None
+for line in spec.parsed.splitlines():
+  r = vcs_re.match(line)
+  if r:
+    uri=r.group(1).strip()
+    break
+
+if not uri:
+  exit(0)
+
+uri_re = re.compile("([a-z]+)\\+([^#]+)#(.+)")
+vcs_match = uri_re.match(uri)
+if not vcs_match or len(vcs_match.groups()) < 3:
+  print(f"URI is not in expected format [vcs]+URI#[tag]: {uri}")
+  exit(1)
+
+vcs = vcs_match.group(1)
+repo_uri = vcs_match.group(2)
+tag = vcs_match.group(3)
+
+if vcs != "git":
+  print("Only git is supported, but found: {vcs}")
+
+clonepath = tempfile.mkdtemp()
+
+git_run = subprocess.run(["git", "-C", clonepath, "clone", repo_uri, "--branch", tag, "repo"], capture_output=True)
+
+if git_run.returncode > 0:
+  print(f"Git clone exited with {git_run.returncode}: {git_run.stdout} \n {git_run.stderr}")
+  exit(1)
+
+tarurl,_,_ = next(reversed(spec.sources)) # TODO: cleanup, assuming first source0 is the tar.gz
+
+tarfile = tempfile.mktemp()
+r = requests.get(tarurl)
+
+with open(tarfile, 'wb') as f:
+    f.write(r.content)
+
+extractpath = tempfile.mkdtemp()
+
+tar_run = subprocess.run(["tar", "xf", tarfile, "-C", extractpath, "--strip-components=1"], capture_output=True)
+if tar_run.returncode > 0:
+  print(f"Git clone exited with {tar_run.returncode}: {tar_run.stdout} \n {tar_run.stderr}")
+  exit(1)
+
+dcmp = dircmp(extractpath, clonepath + "/repo") 
+report_diff(".", dcmp) 
+
+
+shutil.rmtree(clonepath)
+os.remove(tarfile)
+shutil.rmtree(extractpath)
